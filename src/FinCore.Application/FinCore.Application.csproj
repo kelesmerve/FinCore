@@ -1,8 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\FinGuard.Application\FinGuard.Application.csproj" />
-    <ProjectReference Include="..\FinGuard.Domain\FinGuard.Domain.csproj" />
+    <ProjectReference Include="..\FinCore.Domain\FinCore.Domain.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

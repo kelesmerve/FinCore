@@ -5,21 +5,21 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72D-47B6-A68D-7590B98EB39B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FinGuard.Api", "src\FinGuard.Api\FinGuard.Api.csproj", "{45B39E4A-FA79-4C43-B72E-E6D96485E87B}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FinCore.Api", "src\FinCore.Api\FinCore.Api.csproj", "{45B39E4A-FA79-4C43-B72E-E6D96485E87B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FinGuard.Application", "src\FinGuard.Application\FinGuard.Application.csproj", "{30D05241-7603-4588-A838-CD6C1796D936}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FinCore.Application", "src\FinCore.Application\FinCore.Application.csproj", "{30D05241-7603-4588-A838-CD6C1796D936}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FinGuard.Domain", "src\FinGuard.Domain\FinGuard.Domain.csproj", "{1487E0AF-740F-4B48-9A1E-1EB7756AAE8B}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FinCore.Domain", "src\FinCore.Domain\FinCore.Domain.csproj", "{1487E0AF-740F-4B48-9A1E-1EB7756AAE8B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FinGuard.Infrastructure", "src\FinGuard.Infrastructure\FinGuard.Infrastructure.csproj", "{2B1507FD-2AC9-47E1-93F3-0649C6ED0990}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FinCore.Infrastructure", "src\FinCore.Infrastructure\FinCore.Infrastructure.csproj", "{2B1507FD-2AC9-47E1-93F3-0649C6ED0990}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05-4346-4AA6-1389-037BE0695223}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FinGuard.Application.Tests", "tests\FinGuard.Application.Tests\FinGuard.Application.Tests.csproj", "{14AA0367-DE10-49AE-AB44-DC5AA5D20795}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FinCore.Application.Tests", "tests\FinCore.Application.Tests\FinCore.Application.Tests.csproj", "{14AA0367-DE10-49AE-AB44-DC5AA5D20795}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FinGuard.Domain.Tests", "tests\FinGuard.Domain.Tests\FinGuard.Domain.Tests.csproj", "{D3E42399-CC0B-43BB-B4AA-43F45BD040C1}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FinCore.Domain.Tests", "tests\FinCore.Domain.Tests\FinCore.Domain.Tests.csproj", "{D3E42399-CC0B-43BB-B4AA-43F45BD040C1}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FinGuard.IntegrationTests", "tests\FinGuard.IntegrationTests\FinGuard.IntegrationTests.csproj", "{3DD4B2D4-A60A-467D-8AC2-9908A3283106}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FinCore.IntegrationTests", "tests\FinCore.IntegrationTests\FinCore.IntegrationTests.csproj", "{3DD4B2D4-A60A-467D-8AC2-9908A3283106}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
