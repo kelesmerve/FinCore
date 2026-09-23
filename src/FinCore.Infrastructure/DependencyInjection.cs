@@ -1,3 +1,5 @@
+using FinCore.Application.Security;
+using FinCore.Infrastructure.Security;
 using FinCore.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,6 +15,7 @@ public static class DependencyInjection
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
 
         services.AddDbContext<FinCoreDbContext>(options => options.UseNpgsql(connectionString));
+        services.AddScoped<IPasswordHasher, AspNetCorePasswordHasher>();
         return services;
     }
 }
