@@ -4,12 +4,16 @@ namespace FinCore.Domain.Entities;
 
 public sealed class Account
 {
-    public Guid Id { get; }
-    public Guid UserId { get; }
-    public string AccountNumber { get; }
-    public Money Balance { get; private set; }
+    public Guid Id { get; private set; }
+    public Guid UserId { get; private set; }
+    public string AccountNumber { get; private set; } = null!;
+    public Money Balance { get; private set; } = null!;
     public AccountStatus Status { get; private set; }
-    public DateTime CreatedAtUtc { get; }
+    public DateTime CreatedAtUtc { get; private set; }
+
+    private Account()
+    {
+    }
 
     public Account(Guid userId, string accountNumber)
     {

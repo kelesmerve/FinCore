@@ -4,12 +4,18 @@ namespace FinCore.Domain.Entities;
 
 public sealed class LedgerTransaction
 {
-    public Guid Id { get; }
-    public Guid SourceAccountId { get; }
-    public Guid DestinationAccountId { get; }
-    public Money Amount { get; }
-    public DateTime CreatedAtUtc { get; }
-    public IReadOnlyCollection<LedgerEntry> Entries { get; }
+    private readonly List<LedgerEntry> _entries = new();
+
+    public Guid Id { get; private set; }
+    public Guid SourceAccountId { get; private set; }
+    public Guid DestinationAccountId { get; private set; }
+    public Money Amount { get; private set; } = null!;
+    public DateTime CreatedAtUtc { get; private set; }
+    public IReadOnlyCollection<LedgerEntry> Entries => _entries.AsReadOnly();
+
+    private LedgerTransaction()
+    {
+    }
 
     private LedgerTransaction(Guid sourceAccountId, Guid destinationAccountId, Money amount)
     {
@@ -18,7 +24,7 @@ public sealed class LedgerTransaction
         DestinationAccountId = destinationAccountId;
         Amount = amount;
         CreatedAtUtc = DateTime.UtcNow;
-        Entries = Array.AsReadOnly(new[]
+        _entries.AddRange(new[]
         {
             new LedgerEntry(Id, SourceAccountId, LedgerEntryType.Debit, Amount, CreatedAtUtc),
             new LedgerEntry(Id, DestinationAccountId, LedgerEntryType.Credit, Amount, CreatedAtUtc)

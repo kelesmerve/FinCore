@@ -4,12 +4,16 @@ namespace FinCore.Domain.Entities;
 
 public sealed class LedgerEntry
 {
-    public Guid Id { get; }
-    public Guid LedgerTransactionId { get; }
-    public Guid AccountId { get; }
-    public LedgerEntryType Type { get; }
-    public Money Amount { get; }
-    public DateTime CreatedAtUtc { get; }
+    public Guid Id { get; private set; }
+    public Guid LedgerTransactionId { get; private set; }
+    public Guid AccountId { get; private set; }
+    public LedgerEntryType Type { get; private set; }
+    public Money Amount { get; private set; } = null!;
+    public DateTime CreatedAtUtc { get; private set; }
+
+    private LedgerEntry()
+    {
+    }
 
     internal LedgerEntry(
         Guid ledgerTransactionId,
