@@ -12,6 +12,9 @@ public sealed class AccountConfiguration : IEntityTypeConfiguration<Account>
         builder.HasKey(account => account.Id);
         builder.Property(account => account.Id).HasColumnName("id").ValueGeneratedNever();
         builder.Property(account => account.UserId).HasColumnName("user_id");
+        builder.HasOne<User>().WithMany()
+            .HasForeignKey(account => account.UserId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(account => account.UserId);
         builder.Property(account => account.AccountNumber)
             .HasColumnName("account_number").HasMaxLength(34).IsRequired();
         builder.HasIndex(account => account.AccountNumber).IsUnique();

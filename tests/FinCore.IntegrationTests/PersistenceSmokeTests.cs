@@ -10,7 +10,7 @@ namespace FinCore.IntegrationTests;
 public class PersistenceSmokeTests
 {
     [Fact]
-    public async Task SaveAndReload_PreservesAccountsMoneyAndLedgerEntries()
+    public async Task SaveAndReload_PreservesUsersAccountsMoneyAndLedgerEntries()
     {
         // Arrange
         var configuration = new ConfigurationBuilder()
@@ -27,8 +27,10 @@ public class PersistenceSmokeTests
         var options = new DbContextOptionsBuilder<FinCoreDbContext>()
             .UseNpgsql(connectionString)
             .Options;
-        var source = new Account(Guid.NewGuid(), Guid.NewGuid().ToString("N"));
-        var destination = new Account(Guid.NewGuid(), Guid.NewGuid().ToString("N"));
+        var sourceUser = User.CreateCustomer($"{Guid.NewGuid():N}@example.com", "test-password-hash");
+        var destinationUser = User.CreateCustomer($"{Guid.NewGuid():N}@example.com", "test-password-hash");
+        var source = new Account(sourceUser.Id, Guid.NewGuid().ToString("N"));
+        var destination = new Account(destinationUser.Id, Guid.NewGuid().ToString("N"));
         source.Credit(new Money(100.25m));
         var amount = new Money(25.50m);
         var transaction = LedgerTransaction.CreateTransfer(source.Id, destination.Id, amount);
@@ -38,11 +40,14 @@ public class PersistenceSmokeTests
         try
         {
             // Act
+            context.Users.AddRange(sourceUser, destinationUser);
             context.Accounts.AddRange(source, destination);
             context.LedgerTransactions.Add(transaction);
             await context.SaveChangesAsync();
             context.ChangeTracker.Clear();
 
+            var loadedSourceUser = await context.Users.SingleAsync(user => user.Id == sourceUser.Id);
+            var loadedDestinationUser = await context.Users.SingleAsync(user => user.Id == destinationUser.Id);
             var loadedSource = await context.Accounts.SingleAsync(account => account.Id == source.Id);
             var loadedDestination = await context.Accounts.SingleAsync(account => account.Id == destination.Id);
             var loadedTransaction = await context.LedgerTransactions
@@ -50,6 +55,19 @@ public class PersistenceSmokeTests
                 .SingleAsync(item => item.Id == transaction.Id);
 
             // Assert
+            Assert.NotSame(sourceUser, loadedSourceUser);
+            Assert.NotSame(destinationUser, loadedDestinationUser);
+            Assert.Equal(sourceUser.Email, loadedSourceUser.Email);
+            Assert.Equal(destinationUser.Email, loadedDestinationUser.Email);
+            Assert.All(new[] { loadedSourceUser, loadedDestinationUser }, user =>
+            {
+                Assert.Equal("test-password-hash", user.PasswordHash);
+                Assert.Equal(UserRole.Customer, user.Role);
+                Assert.True(user.IsActive);
+                Assert.Equal(DateTimeKind.Utc, user.CreatedAtUtc.Kind);
+            });
+            Assert.Equal(loadedSourceUser.Id, loadedSource.UserId);
+            Assert.Equal(loadedDestinationUser.Id, loadedDestination.UserId);
             Assert.NotSame(source, loadedSource);
             Assert.NotSame(destination, loadedDestination);
             Assert.NotSame(transaction, loadedTransaction);
@@ -95,6 +113,9 @@ public class PersistenceSmokeTests
                 .ExecuteDeleteAsync();
             await cleanup.Accounts
                 .Where(account => account.Id == source.Id || account.Id == destination.Id)
+                .ExecuteDeleteAsync();
+            await cleanup.Users
+                .Where(user => user.Id == sourceUser.Id || user.Id == destinationUser.Id)
                 .ExecuteDeleteAsync();
             await cleanupTransaction.CommitAsync();
         }
