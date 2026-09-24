@@ -40,7 +40,9 @@ builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationSc
             NameClaimType = "sub"
         };
     });
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+    options.AddPolicy("AdminOnly", policy =>
+        policy.RequireAuthenticatedUser().RequireRole(FinCore.Application.Security.RoleNames.Admin)));
 
 var app = builder.Build();
 
