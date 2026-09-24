@@ -1,3 +1,4 @@
+using FinCore.Application;
 using FinCore.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -10,7 +11,13 @@ if (string.IsNullOrWhiteSpace(connectionString))
 }
 
 builder.Services.AddInfrastructure(connectionString);
+builder.Services.AddApplication();
+builder.Services.AddControllers();
 
 var app = builder.Build();
 
+app.MapControllers();
+
 app.Run();
+
+public partial class Program { }
