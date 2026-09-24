@@ -1,3 +1,4 @@
+using FinCore.Application.Features.Users.Login;
 using FinCore.Application.Features.Users.Register;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -8,6 +9,7 @@ public static class DependencyInjection
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
         services.AddScoped<RegisterUserHandler>();
+        services.AddScoped<LoginUserHandler>();
         return services;
     }
 }
