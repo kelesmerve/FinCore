@@ -10,7 +10,7 @@ if (string.IsNullOrWhiteSpace(connectionString))
         "Connection string 'FinCoreDatabase' is missing or empty. Configure ConnectionStrings:FinCoreDatabase using User Secrets or environment variables.");
 }
 
-builder.Services.AddInfrastructure(connectionString);
+builder.Services.AddInfrastructure(connectionString, builder.Configuration.GetSection("Jwt"));
 builder.Services.AddApplication();
 builder.Services.AddControllers();
 

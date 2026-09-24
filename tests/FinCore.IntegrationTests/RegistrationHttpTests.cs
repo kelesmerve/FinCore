@@ -113,6 +113,8 @@ public class RegistrationHttpTests
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseEnvironment("Testing");
+            builder.ConfigureAppConfiguration((_, configuration) =>
+                configuration.AddUserSecrets<RegistrationHttpTests>(optional: true).AddEnvironmentVariables());
             builder.UseSetting("ConnectionStrings:FinCoreDatabase", _connectionString);
         }
 

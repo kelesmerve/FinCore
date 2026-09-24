@@ -30,7 +30,7 @@ public class UserRegistrationTests
         }
 
         var services = new ServiceCollection();
-        services.AddInfrastructure(connectionString);
+        services.AddInfrastructure(connectionString, configuration.GetSection("Jwt"));
         await using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
         await using var scope = provider.CreateAsyncScope();
         var store = scope.ServiceProvider.GetRequiredService<IUserRegistrationStore>();
