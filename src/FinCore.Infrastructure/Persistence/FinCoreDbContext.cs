@@ -9,6 +9,7 @@ public sealed class FinCoreDbContext : DbContext
     {
     }
 
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<User> Users => Set<User>();
     public DbSet<Account> Accounts => Set<Account>();
     public DbSet<LedgerTransaction> LedgerTransactions => Set<LedgerTransaction>();
