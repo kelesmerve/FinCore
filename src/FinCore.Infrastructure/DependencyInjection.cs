@@ -41,6 +41,7 @@ public static class DependencyInjection
         services.AddScoped<IRefreshTokenStore, EfRefreshTokenStore>();
         services.AddScoped<ITransferStore, EfTransferStore>();
         services.AddScoped<IIdempotentTransferStore, EfIdempotentTransferStore>();
+        services.AddScoped<IAccountQueryStore, EfAccountQueryStore>();
         return services;
     }
 }
