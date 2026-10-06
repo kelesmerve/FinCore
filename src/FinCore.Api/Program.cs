@@ -18,6 +18,7 @@ if (string.IsNullOrWhiteSpace(connectionString))
 builder.Services.AddInfrastructure(connectionString, builder.Configuration.GetSection("Jwt"));
 builder.Services.AddApplication();
 builder.Services.AddControllers();
+builder.Services.AddProblemDetails();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
 builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
     .Configure<IOptions<JwtOptions>>((options, jwtOptions) =>
@@ -46,6 +47,7 @@ builder.Services.AddAuthorization(options =>
 
 var app = builder.Build();
 
+app.UseExceptionHandler();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

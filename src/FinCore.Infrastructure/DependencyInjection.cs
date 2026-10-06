@@ -40,6 +40,7 @@ public static class DependencyInjection
         services.AddSingleton<IRefreshTokenGenerator, RefreshTokenGenerator>();
         services.AddScoped<IRefreshTokenStore, EfRefreshTokenStore>();
         services.AddScoped<ITransferStore, EfTransferStore>();
+        services.AddScoped<IIdempotentTransferStore, EfIdempotentTransferStore>();
         return services;
     }
 }

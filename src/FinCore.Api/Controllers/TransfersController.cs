@@ -7,7 +7,7 @@ namespace FinCore.Api.Controllers;
 [ApiController]
 [Route("api/transfers")]
 [Authorize]
-public sealed class TransfersController(TransferMoneyHandler handler) : ControllerBase
+public sealed class TransfersController(IdempotentTransferHandler handler) : ControllerBase
 {
     [HttpPost]
     public async Task<ActionResult<TransferMoneyResult>> Transfer(
@@ -16,10 +16,17 @@ public sealed class TransfersController(TransferMoneyHandler handler) : Controll
         if (!Guid.TryParse(User.FindFirst("sub")?.Value, out var userId) || userId == Guid.Empty)
             return Problem(statusCode: StatusCodes.Status401Unauthorized, title: "Unauthorized");
 
+        if (!Request.Headers.TryGetValue("Idempotency-Key", out var values) || values.Count != 1 ||
+            string.IsNullOrWhiteSpace(values[0]) || values[0]!.Length > 128)
+            return Problem(statusCode: StatusCodes.Status400BadRequest, title: "Invalid Idempotency-Key");
+
         try
         {
-            return Ok(await handler.HandleAsync(new TransferMoneyCommand(
-                userId, request.SourceAccountId, request.DestinationAccountId, request.Amount), cancellationToken));
+            var result = await handler.HandleAsync(new TransferMoneyCommand(
+                userId, request.SourceAccountId, request.DestinationAccountId, request.Amount),
+                values[0], cancellationToken);
+            if (result.IsReplay) Response.Headers["Idempotency-Replayed"] = "true";
+            return Ok(result.Transfer);
         }
         catch (TransferValidationException)
         {
@@ -41,6 +48,10 @@ public sealed class TransfersController(TransferMoneyHandler handler) : Controll
         {
             return Problem(statusCode: StatusCodes.Status409Conflict,
                 title: "Transfer conflict", detail: "Account data changed. Please retry the transfer.");
+        }
+        catch (IdempotencyConflictException)
+        {
+            return Problem(statusCode: StatusCodes.Status409Conflict, title: "Idempotency conflict");
         }
     }
 }

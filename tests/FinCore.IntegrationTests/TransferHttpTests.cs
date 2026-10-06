@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.Json;
 using FinCore.Domain.Entities;
 using FinCore.Domain.ValueObjects;
+using FinCore.Application.Features.Transfers.Transfer;
 using FinCore.Infrastructure.Persistence;
 using FinCore.Infrastructure.Security;
 using Microsoft.AspNetCore.Hosting;
@@ -22,6 +23,163 @@ namespace FinCore.IntegrationTests;
 
 public sealed class TransferHttpTests
 {
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("empty")]
+    [InlineData("whitespace")]
+    [InlineData("too-long")]
+    [InlineData("multiple")]
+    public async Task Transfer_InvalidIdempotencyHeader_Returns400(string scenario)
+    {
+        using var factory = new TransferFactory();
+        using var client = factory.CreateClient();
+        factory.Authenticate(client, Guid.NewGuid().ToString());
+        client.DefaultRequestHeaders.Remove("Idempotency-Key");
+        var values = scenario switch
+        {
+            "empty" => new[] { "" },
+            "whitespace" => new[] { "   " },
+            "too-long" => new[] { new string('x', 129) },
+            "multiple" => new[] { "first", "second" },
+            _ => []
+        };
+        if (values.Length > 0)
+            client.DefaultRequestHeaders.TryAddWithoutValidation("Idempotency-Key", values);
+        using var response = await client.PostAsJsonAsync("/api/transfers", new
+        {
+            SourceAccountId = Guid.NewGuid(), DestinationAccountId = Guid.NewGuid(), Amount = 1m
+        });
+        await AssertProblemAsync(response, HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Transfer_ReplayReturnsSameResultAndDifferentPayloadConflictsWithoutMovement()
+    {
+        using var factory = new TransferFactory();
+        var data = await factory.SeedAsync();
+        try
+        {
+            using var client = factory.CreateClient();
+            factory.Authenticate(client, data.SourceUser.Id.ToString());
+            var key = client.DefaultRequestHeaders.GetValues("Idempotency-Key").Single();
+            var request = new { SourceAccountId = data.Source.Id, DestinationAccountId = data.Destination.Id, Amount = 25m };
+            using var first = await client.PostAsJsonAsync("/api/transfers", request);
+            Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+            using var repeated = await client.PostAsJsonAsync("/api/transfers", new
+            {
+                SourceAccountId = data.Source.Id, DestinationAccountId = data.Destination.Id, Amount = 25.00m
+            });
+            Assert.Equal(HttpStatusCode.OK, repeated.StatusCode);
+            Assert.Equal("true", repeated.Headers.GetValues("Idempotency-Replayed").Single());
+            using var firstJson = JsonDocument.Parse(await first.Content.ReadAsStringAsync());
+            using var repeatedJson = JsonDocument.Parse(await repeated.Content.ReadAsStringAsync());
+            var transactionId = firstJson.RootElement.GetProperty("transactionId").GetGuid();
+            Assert.Equal(transactionId, repeatedJson.RootElement.GetProperty("transactionId").GetGuid());
+            Assert.Equal(firstJson.RootElement.GetProperty("amount").GetDecimal(), repeatedJson.RootElement.GetProperty("amount").GetDecimal());
+            using var conflict = await client.PostAsJsonAsync("/api/transfers", new
+            {
+                SourceAccountId = data.Source.Id, DestinationAccountId = data.Destination.Id, Amount = 26m
+            });
+            await AssertProblemAsync(conflict, HttpStatusCode.Conflict);
+
+            await using var context = factory.CreateDbContext();
+            Assert.Equal(new Money(75m), (await context.Accounts.SingleAsync(a => a.Id == data.Source.Id)).Balance);
+            Assert.Equal(new Money(25m), (await context.Accounts.SingleAsync(a => a.Id == data.Destination.Id)).Balance);
+            Assert.Equal(1, await context.LedgerTransactions.CountAsync(t => t.SourceAccountId == data.Source.Id));
+            Assert.Equal(2, await context.LedgerEntries.CountAsync(e => e.LedgerTransactionId == transactionId));
+            var record = await context.IdempotencyRecords.SingleAsync(r => r.UserId == data.SourceUser.Id);
+            Assert.Equal("money-transfer", record.Operation);
+            Assert.Equal(key, record.Key);
+            Assert.Equal(TransferRequestFingerprint.Compute(data.Source.Id, data.Destination.Id, 25m), record.RequestHash);
+            Assert.Equal(200, record.StatusCode);
+            Assert.InRange(record.ExpiresAtUtc - record.CreatedAtUtc, TimeSpan.FromHours(24), TimeSpan.FromHours(24));
+            using var payload = JsonDocument.Parse(record.ResponsePayload);
+            Assert.Equal(transactionId, payload.RootElement.GetProperty("transactionId").GetGuid());
+            Assert.Equal(new[] { "amount", "createdAtUtc", "currency", "destinationAccountId", "sourceAccountId", "transactionId" },
+                payload.RootElement.EnumerateObject().Select(p => p.Name).OrderBy(n => n));
+            Assert.DoesNotContain("password", record.ResponsePayload, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("token", record.ResponsePayload, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("balance", record.ResponsePayload, StringComparison.OrdinalIgnoreCase);
+        }
+        finally { await factory.CleanupAsync(data); }
+    }
+
+    [Fact]
+    public async Task Transfer_SameKeyForDifferentUsers_IsIndependent()
+    {
+        using var factory = new TransferFactory();
+        var data = await factory.SeedAsync();
+        try
+        {
+            await using (var context = factory.CreateDbContext())
+            {
+                (await context.Accounts.SingleAsync(a => a.Id == data.Destination.Id)).Credit(new Money(50m));
+                await context.SaveChangesAsync();
+            }
+            var key = Guid.NewGuid().ToString("N");
+            using var firstClient = factory.CreateClient();
+            using var secondClient = factory.CreateClient();
+            factory.Authenticate(firstClient, data.SourceUser.Id.ToString());
+            factory.Authenticate(secondClient, data.DestinationUser.Id.ToString());
+            firstClient.DefaultRequestHeaders.Remove("Idempotency-Key");
+            secondClient.DefaultRequestHeaders.Remove("Idempotency-Key");
+            firstClient.DefaultRequestHeaders.Add("Idempotency-Key", key);
+            secondClient.DefaultRequestHeaders.Add("Idempotency-Key", key);
+            using var first = await firstClient.PostAsJsonAsync("/api/transfers", new
+            {
+                SourceAccountId = data.Source.Id, DestinationAccountId = data.Destination.Id, Amount = 10m
+            });
+            using var second = await secondClient.PostAsJsonAsync("/api/transfers", new
+            {
+                SourceAccountId = data.Destination.Id, DestinationAccountId = data.Source.Id, Amount = 5m
+            });
+            Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+            Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+            await using var verify = factory.CreateDbContext();
+            Assert.Equal(2, await verify.IdempotencyRecords.CountAsync(r => r.Key == key));
+            Assert.Equal(2, await verify.LedgerTransactions.CountAsync(t => t.SourceAccountId == data.Source.Id || t.SourceAccountId == data.Destination.Id));
+        }
+        finally { await factory.CleanupAsync(data); }
+    }
+
+    [Fact]
+    public async Task Transfer_ConcurrentSameKeyAndPayload_CreatesOneLedgerAndReplaysSameTransaction()
+    {
+        using var factory = new TransferFactory();
+        var data = await factory.SeedAsync();
+        try
+        {
+            var key = Guid.NewGuid().ToString("N");
+            using var firstClient = factory.CreateClient();
+            using var secondClient = factory.CreateClient();
+            factory.Authenticate(firstClient, data.SourceUser.Id.ToString());
+            factory.Authenticate(secondClient, data.SourceUser.Id.ToString());
+            firstClient.DefaultRequestHeaders.Remove("Idempotency-Key");
+            secondClient.DefaultRequestHeaders.Remove("Idempotency-Key");
+            firstClient.DefaultRequestHeaders.Add("Idempotency-Key", key);
+            secondClient.DefaultRequestHeaders.Add("Idempotency-Key", key);
+            var body = new { SourceAccountId = data.Source.Id, DestinationAccountId = data.Destination.Id, Amount = 20m };
+            var requests = await Task.WhenAll(
+                firstClient.PostAsJsonAsync("/api/transfers", body),
+                secondClient.PostAsJsonAsync("/api/transfers", body));
+            using var first = requests[0];
+            using var second = requests[1];
+            Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+            Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+            using var firstJson = JsonDocument.Parse(await first.Content.ReadAsStringAsync());
+            using var secondJson = JsonDocument.Parse(await second.Content.ReadAsStringAsync());
+            var transactionId = firstJson.RootElement.GetProperty("transactionId").GetGuid();
+            Assert.Equal(transactionId, secondJson.RootElement.GetProperty("transactionId").GetGuid());
+            await using var verify = factory.CreateDbContext();
+            Assert.Equal(new Money(80m), (await verify.Accounts.SingleAsync(a => a.Id == data.Source.Id)).Balance);
+            Assert.Equal(new Money(20m), (await verify.Accounts.SingleAsync(a => a.Id == data.Destination.Id)).Balance);
+            Assert.Equal(1, await verify.IdempotencyRecords.CountAsync(r => r.UserId == data.SourceUser.Id && r.Key == key));
+            Assert.Equal(1, await verify.LedgerTransactions.CountAsync(t => t.SourceAccountId == data.Source.Id));
+            Assert.Equal(2, await verify.LedgerEntries.CountAsync(e => e.LedgerTransactionId == transactionId));
+        }
+        finally { await factory.CleanupAsync(data); }
+    }
+
     [Fact]
     public async Task Transfer_WithoutJwtOrValidSubject_Returns401()
     {
@@ -122,6 +280,7 @@ public sealed class TransferHttpTests
             Assert.Equal(Money.Zero, (await verify.Accounts.SingleAsync(a => a.Id == data.Destination.Id)).Balance);
             Assert.False(await verify.LedgerTransactions.AnyAsync(t => t.SourceAccountId == data.Source.Id || t.DestinationAccountId == data.Destination.Id));
             Assert.False(await verify.LedgerEntries.AnyAsync(e => e.AccountId == data.Source.Id || e.AccountId == data.Destination.Id));
+            Assert.False(await verify.IdempotencyRecords.AnyAsync(r => r.UserId == data.SourceUser.Id || r.UserId == data.DestinationUser.Id));
         }
         finally { await factory.CleanupAsync(data); }
     }
@@ -165,6 +324,7 @@ public sealed class TransferHttpTests
                 now, now.AddMinutes(5),
                 new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(options.SecretKey)), SecurityAlgorithms.HmacSha256));
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", new JwtSecurityTokenHandler().WriteToken(token));
+            client.DefaultRequestHeaders.Add("Idempotency-Key", Guid.NewGuid().ToString("N"));
         }
 
         public async Task<Seed> SeedAsync()
@@ -191,8 +351,9 @@ public sealed class TransferHttpTests
                 .Select(t => t.Id).ToArrayAsync();
             await context.LedgerEntries.Where(e => transactionIds.Contains(e.LedgerTransactionId)).ExecuteDeleteAsync();
             await context.LedgerTransactions.Where(t => transactionIds.Contains(t.Id)).ExecuteDeleteAsync();
-            await context.Accounts.Where(a => accountIds.Contains(a.Id)).ExecuteDeleteAsync();
             var userIds = new[] { data.SourceUser.Id, data.DestinationUser.Id };
+            await context.IdempotencyRecords.Where(r => userIds.Contains(r.UserId)).ExecuteDeleteAsync();
+            await context.Accounts.Where(a => accountIds.Contains(a.Id)).ExecuteDeleteAsync();
             await context.Users.Where(u => userIds.Contains(u.Id)).ExecuteDeleteAsync();
             await transaction.CommitAsync();
         }

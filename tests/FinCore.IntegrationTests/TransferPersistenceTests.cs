@@ -21,6 +21,32 @@ public sealed class TransferPersistenceTests
     }
 
     [Fact]
+    public async Task IdempotencyRecordFailure_RollsBackTransferBalancesAndLedger()
+    {
+        var (sourceUser, destinationUser, source, destination) = await SeedAsync();
+        try
+        {
+            await using (var context = CreateContext())
+            {
+                var transfer = new TransferMoneyHandler(new EfTransferStore(context));
+                var idempotency = new EfIdempotentTransferStore(context);
+                await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => idempotency.ExecuteAsync(
+                    sourceUser.Id, new string('o', 101), Guid.NewGuid().ToString("N"), new string('A', 64),
+                    ct => transfer.HandleAsync(new TransferMoneyCommand(
+                        sourceUser.Id, source.Id, destination.Id, 20m), ct), default));
+            }
+
+            await using var verify = CreateContext();
+            Assert.Equal(new Money(100m), (await verify.Accounts.SingleAsync(a => a.Id == source.Id)).Balance);
+            Assert.Equal(Money.Zero, (await verify.Accounts.SingleAsync(a => a.Id == destination.Id)).Balance);
+            Assert.False(await verify.LedgerTransactions.AnyAsync(t => t.SourceAccountId == source.Id));
+            Assert.False(await verify.LedgerEntries.AnyAsync(e => e.AccountId == source.Id || e.AccountId == destination.Id));
+            Assert.False(await verify.IdempotencyRecords.AnyAsync(r => r.UserId == sourceUser.Id));
+        }
+        finally { await CleanupAsync(sourceUser.Id, destinationUser.Id); }
+    }
+
+    [Fact]
     public async Task SuccessfulTransfer_PersistsBothBalancesAndBalancedLedger()
     {
         var (sourceUser, destinationUser, source, destination) = await SeedAsync();

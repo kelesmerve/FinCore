@@ -14,6 +14,20 @@ public sealed class EfTransferStore(FinCoreDbContext context) : ITransferStore
         Account source, Account destination, LedgerTransaction transaction,
         CancellationToken cancellationToken)
     {
+        if (context.Database.CurrentTransaction is not null)
+        {
+            try
+            {
+                await context.LedgerTransactions.AddAsync(transaction, cancellationToken);
+                await context.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                throw new TransferConcurrencyException();
+            }
+            return;
+        }
+
         await using var databaseTransaction = await context.Database.BeginTransactionAsync(cancellationToken);
         try
         {

@@ -18,6 +18,7 @@ public static class DependencyInjection
         services.AddScoped<RefreshTokenHandler>();
         services.AddScoped<LogoutHandler>();
         services.AddScoped<TransferMoneyHandler>();
+        services.AddScoped<IdempotentTransferHandler>();
         return services;
     }
 }
