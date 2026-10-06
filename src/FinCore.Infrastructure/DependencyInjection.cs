@@ -38,6 +38,7 @@ public static class DependencyInjection
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
         services.AddScoped<IUserQueryStore, EfUserQueryStore>();
         services.AddSingleton<IRefreshTokenGenerator, RefreshTokenGenerator>();
+        services.AddScoped<IRefreshTokenStore, EfRefreshTokenStore>();
         return services;
     }
 }

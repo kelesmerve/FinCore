@@ -1,3 +1,4 @@
+using FinCore.Infrastructure.Security;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -28,11 +29,11 @@ public class LoginHttpTests
                 new { Email = $" {email.ToUpperInvariant()} ", Password });
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-            Assert.Equal(new[] { "accessToken", "expiresAtUtc" },
+            Assert.Equal(new[] { "accessToken", "accessTokenExpiresAtUtc", "refreshToken", "refreshTokenExpiresAtUtc" },
                 json.RootElement.EnumerateObject().Select(p => p.Name).OrderBy(n => n));
             var token = json.RootElement.GetProperty("accessToken").GetString();
             Assert.False(string.IsNullOrWhiteSpace(token));
-            Assert.InRange(json.RootElement.GetProperty("expiresAtUtc").GetDateTime(),
+            Assert.InRange(json.RootElement.GetProperty("accessTokenExpiresAtUtc").GetDateTime(),
                 DateTime.UtcNow.AddMinutes(14), DateTime.UtcNow.AddMinutes(16));
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             using var me = await client.GetAsync("/api/auth/me");
@@ -45,6 +46,24 @@ public class LoginHttpTests
             Assert.Equal(user.Id, identity.RootElement.GetProperty("userId").GetGuid());
             Assert.Equal(email, identity.RootElement.GetProperty("email").GetString());
             Assert.Equal("Customer", identity.RootElement.GetProperty("role").GetString());
+            var rawRefresh = json.RootElement.GetProperty("refreshToken").GetString();
+            Assert.False(string.IsNullOrWhiteSpace(rawRefresh));
+            var expectedHash = new RefreshTokenGenerator().Hash(rawRefresh!);
+            var saved = await context.RefreshTokens.SingleAsync(t => t.UserId == user.Id);
+            Assert.True(expectedHash == saved.TokenHash);
+            Assert.False(rawRefresh == saved.TokenHash);
+            var rows = await context.RefreshTokens.Where(t => t.UserId == user.Id).ToListAsync();
+            Assert.False(JsonSerializer.Serialize(rows).Contains(rawRefresh!, StringComparison.Ordinal));
+            var responseBody = json.RootElement.GetRawText();
+            Assert.False(responseBody.Contains(saved.TokenHash, StringComparison.Ordinal));
+            Assert.False(responseBody.Contains(user.PasswordHash, StringComparison.Ordinal));
+            Assert.False(responseBody.Contains(Password, StringComparison.Ordinal));
+            var expires = json.RootElement.GetProperty("refreshTokenExpiresAtUtc").GetDateTime();
+            Assert.True((expires - saved.ExpiresAtUtc).Duration() <= TimeSpan.FromMicroseconds(1),
+                "Response and persisted refresh token expiration must differ by at most one microsecond.");
+            Assert.Equal(DateTimeKind.Utc, expires.Kind);
+            Assert.Equal(TimeSpan.FromDays(7), saved.ExpiresAtUtc - saved.CreatedAtUtc);
+            Assert.InRange(expires, DateTime.UtcNow.AddDays(7).AddMinutes(-1), DateTime.UtcNow.AddDays(7));
         }
         finally { await factory.CleanupAsync(email); }
     }
@@ -87,6 +106,9 @@ public class LoginHttpTests
                 second.RootElement.EnumerateObject().Select(p => p.Name).OrderBy(n => n));
             Assert.False(first.RootElement.TryGetProperty("detail", out _));
             Assert.False(second.RootElement.TryGetProperty("detail", out _));
+            await using var context = factory.CreateDbContext();
+            var userId = await context.Users.Where(u => u.Email == email).Select(u => u.Id).SingleAsync();
+            Assert.False(await context.RefreshTokens.AnyAsync(t => t.UserId == userId));
         }
         finally { await factory.CleanupAsync(email); }
     }
@@ -111,6 +133,9 @@ public class LoginHttpTests
             await AssertProblemAsync(wrong, HttpStatusCode.Unauthorized);
             using var correct = await client.PostAsJsonAsync("/api/auth/login", new { Email = email, Password });
             await AssertProblemAsync(correct, HttpStatusCode.Forbidden);
+            await using var verify = factory.CreateDbContext();
+            var userId = await verify.Users.Where(u => u.Email == email).Select(u => u.Id).SingleAsync();
+            Assert.False(await verify.RefreshTokens.AnyAsync(t => t.UserId == userId));
         }
         finally { await factory.CleanupAsync(email); }
     }
@@ -143,6 +168,7 @@ public class LoginHttpTests
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         Assert.Equal((int)status, json.RootElement.GetProperty("status").GetInt32());
+        Assert.False(json.RootElement.TryGetProperty("refreshToken", out _));
         Assert.False(json.RootElement.TryGetProperty("accessToken", out _));
         Assert.False(json.RootElement.TryGetProperty("password", out _));
         Assert.False(json.RootElement.TryGetProperty("passwordHash", out _));
@@ -171,6 +197,10 @@ public class LoginHttpTests
             await using var context = CreateDbContext();
             await using var transaction = await context.Database.BeginTransactionAsync();
             var ids = await context.Users.Where(u => u.Email == email).Select(u => u.Id).ToArrayAsync();
+            await context.RefreshTokens.Where(t => ids.Contains(t.UserId)).ExecuteUpdateAsync(setters => setters
+                .SetProperty(t => t.ParentTokenId, (Guid?)null)
+                .SetProperty(t => t.ReplacedByTokenId, (Guid?)null));
+            await context.RefreshTokens.Where(t => ids.Contains(t.UserId)).ExecuteDeleteAsync();
             await context.Accounts.Where(a => ids.Contains(a.UserId)).ExecuteDeleteAsync();
             await context.Users.Where(u => ids.Contains(u.Id)).ExecuteDeleteAsync();
             await transaction.CommitAsync();
