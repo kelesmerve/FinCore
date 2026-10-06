@@ -22,6 +22,7 @@ public sealed class AccountConfiguration : IEntityTypeConfiguration<Account>
             .HasColumnName("status").HasConversion<string>().IsRequired();
         builder.Property(account => account.CreatedAtUtc)
             .HasColumnName("created_at_utc").HasColumnType("timestamp with time zone");
+        builder.Property<uint>("xmin").IsRowVersion();
 
         builder.ComplexProperty(account => account.Balance, money =>
         {
