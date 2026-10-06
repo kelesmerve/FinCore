@@ -1,3 +1,4 @@
+using FinCore.Application.Features.Users.Refresh;
 using System.Net.Mail;
 using FinCore.Application.Features.Users.Login;
 using Microsoft.AspNetCore.Authorization;
@@ -17,6 +18,20 @@ public sealed class AuthController : ControllerBase
         _handler = handler;
     }
 
+    [AllowAnonymous]
+    [HttpPost("refresh")]
+    public async Task<ActionResult<LoginUserResult>> Refresh(
+        RefreshRequest request, [FromServices] RefreshTokenHandler handler, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Ok(await handler.HandleAsync(new RefreshTokenCommand(request.RefreshToken), cancellationToken));
+        }
+        catch (InvalidRefreshTokenException)
+        {
+            return Problem(statusCode: StatusCodes.Status401Unauthorized, title: "Invalid refresh token");
+        }
+    }
     [HttpPost("login")]
     public async Task<ActionResult<LoginUserResult>> Login(
         LoginRequest request, [FromServices] LoginUserHandler handler, CancellationToken cancellationToken)
@@ -78,3 +93,5 @@ public sealed class AuthController : ControllerBase
 public sealed record LoginRequest(string Email, string Password);
 
 public sealed record RegisterRequest(string Email, string Password);
+
+public sealed record RefreshRequest(string? RefreshToken);

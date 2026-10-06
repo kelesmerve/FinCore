@@ -1,3 +1,4 @@
+using FinCore.Application.Features.Users.Refresh;
 using FinCore.Application.Features.Users.ListUsers;
 using FinCore.Application.Features.Users.Login;
 using FinCore.Application.Features.Users.Register;
@@ -12,6 +13,7 @@ public static class DependencyInjection
         services.AddScoped<RegisterUserHandler>();
         services.AddScoped<LoginUserHandler>();
         services.AddScoped<ListUsersHandler>();
+        services.AddScoped<RefreshTokenHandler>();
         return services;
     }
 }
