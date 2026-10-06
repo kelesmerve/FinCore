@@ -42,6 +42,7 @@ public static class DependencyInjection
         services.AddScoped<ITransferStore, EfTransferStore>();
         services.AddScoped<IIdempotentTransferStore, EfIdempotentTransferStore>();
         services.AddScoped<IAccountQueryStore, EfAccountQueryStore>();
+        services.AddScoped<IAdminBootstrapStore, EfAdminBootstrapStore>();
         return services;
     }
 }

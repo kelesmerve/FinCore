@@ -5,8 +5,11 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using FinCore.Application;
 using FinCore.Infrastructure;
+using FinCore.Application.Features.Users.BootstrapAdmin;
+using FinCore.Application.Features.Users.Register;
 
-var builder = WebApplication.CreateBuilder(args);
+var bootstrapAdmin = args.Contains("--bootstrap-admin", StringComparer.Ordinal);
+var builder = WebApplication.CreateBuilder(args.Where(argument => argument != "--bootstrap-admin").ToArray());
 
 var connectionString = builder.Configuration.GetConnectionString("FinCoreDatabase");
 if (string.IsNullOrWhiteSpace(connectionString))
@@ -46,6 +49,43 @@ builder.Services.AddAuthorization(options =>
         policy.RequireAuthenticatedUser().RequireRole(FinCore.Application.Security.RoleNames.Admin)));
 
 var app = builder.Build();
+
+if (bootstrapAdmin)
+{
+    var email = app.Configuration["BootstrapAdmin:Email"];
+    var password = app.Configuration["BootstrapAdmin:Password"];
+    if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+    {
+        Console.Error.WriteLine("BootstrapAdmin:Email and BootstrapAdmin:Password must be configured.");
+        Environment.ExitCode = 1;
+        return;
+    }
+
+    try
+    {
+        await using var scope = app.Services.CreateAsyncScope();
+        var result = await scope.ServiceProvider.GetRequiredService<BootstrapAdminHandler>()
+            .HandleAsync(email, password);
+        Console.WriteLine(result == BootstrapAdminResult.Created
+            ? "Admin bootstrap completed." : "Admin already exists; no changes made.");
+    }
+    catch (RegistrationValidationException)
+    {
+        Console.Error.WriteLine("Admin bootstrap email or password does not meet registration rules.");
+        Environment.ExitCode = 1;
+    }
+    catch (AdminBootstrapConflictException)
+    {
+        Console.Error.WriteLine("Admin bootstrap conflict: email belongs to a customer.");
+        Environment.ExitCode = 1;
+    }
+    catch (Exception)
+    {
+        Console.Error.WriteLine("Admin bootstrap failed.");
+        Environment.ExitCode = 1;
+    }
+    return;
+}
 
 app.UseExceptionHandler();
 app.UseAuthentication();

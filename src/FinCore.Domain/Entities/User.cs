@@ -14,6 +14,12 @@ public sealed class User
     }
 
     public static User CreateCustomer(string email, string passwordHash)
+        => Create(email, passwordHash, UserRole.Customer);
+
+    public static User CreateAdmin(string email, string passwordHash)
+        => Create(email, passwordHash, UserRole.Admin);
+
+    private static User Create(string email, string passwordHash, UserRole role)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(email);
         ArgumentException.ThrowIfNullOrWhiteSpace(passwordHash);
@@ -23,7 +29,7 @@ public sealed class User
             Id = Guid.NewGuid(),
             Email = email.Trim().ToLowerInvariant(),
             PasswordHash = passwordHash,
-            Role = UserRole.Customer,
+            Role = role,
             IsActive = true,
             CreatedAtUtc = DateTime.UtcNow
         };

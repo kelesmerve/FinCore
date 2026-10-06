@@ -5,6 +5,7 @@ using FinCore.Application.Features.Users.Refresh;
 using FinCore.Application.Features.Users.ListUsers;
 using FinCore.Application.Features.Users.Login;
 using FinCore.Application.Features.Users.Register;
+using FinCore.Application.Features.Users.BootstrapAdmin;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FinCore.Application;
@@ -21,6 +22,7 @@ public static class DependencyInjection
         services.AddScoped<TransferMoneyHandler>();
         services.AddScoped<IdempotentTransferHandler>();
         services.AddScoped<GetMyAccountsHandler>();
+        services.AddScoped<BootstrapAdminHandler>();
         return services;
     }
 }

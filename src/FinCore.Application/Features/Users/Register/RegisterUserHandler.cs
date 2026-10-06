@@ -1,4 +1,3 @@
-using System.Net.Mail;
 using FinCore.Application.Abstractions.Persistence;
 using FinCore.Application.Abstractions.Security;
 using FinCore.Application.Security;
@@ -27,33 +26,15 @@ public sealed class RegisterUserHandler
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(command);
-        if (string.IsNullOrWhiteSpace(command.Email))
-        {
-            throw new RegistrationValidationException("Email is required.");
-        }
-
-        var email = command.Email.Trim().ToLowerInvariant();
-        if (email.Length > 320 || !MailAddress.TryCreate(email, out var address) || address.Address != email)
-        {
-            throw new RegistrationValidationException("Email must be a valid address of at most 320 characters.");
-        }
-
-        var password = command.Password;
-        if (string.IsNullOrWhiteSpace(password) || password.Length < 8 || password.Length > 128
-            || !password.Any(char.IsUpper) || !password.Any(char.IsLower)
-            || !password.Any(char.IsDigit)
-            || !password.Any(character => !char.IsLetterOrDigit(character) && !char.IsWhiteSpace(character)))
-        {
-            throw new RegistrationValidationException(
-                "Password must contain 8-128 characters, including uppercase, lowercase, digit and special character.");
-        }
+        var email = RegistrationInputValidator.NormalizeEmail(command.Email);
+        RegistrationInputValidator.ValidatePassword(command.Password);
 
         if (await _store.EmailExistsAsync(email, cancellationToken))
         {
             throw new DuplicateEmailException();
         }
 
-        var passwordHash = _passwordHasher.Hash(password);
+        var passwordHash = _passwordHasher.Hash(command.Password);
         var user = User.CreateCustomer(email, passwordHash);
         var account = new Account(user.Id, _accountNumberGenerator.Generate());
         await _store.AddAsync(user, account, cancellationToken);
