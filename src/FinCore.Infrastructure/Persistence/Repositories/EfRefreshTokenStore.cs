@@ -10,6 +10,11 @@ public sealed class EfRefreshTokenStore(FinCoreDbContext context) : IRefreshToke
     public Task<RefreshToken?> FindByHashAsync(string tokenHash, CancellationToken cancellationToken) =>
         context.RefreshTokens.AsTracking().SingleOrDefaultAsync(t => t.TokenHash == tokenHash, cancellationToken);
 
+    public async Task<IReadOnlyCollection<RefreshToken>> FindUnrevokedFamilyAsync(
+        Guid userId, Guid familyId, CancellationToken cancellationToken) =>
+        await context.RefreshTokens.AsTracking()
+            .Where(t => t.UserId == userId && t.FamilyId == familyId && t.RevokedAtUtc == null)
+            .ToListAsync(cancellationToken);
     public Task<User?> FindUserAsync(Guid userId, CancellationToken cancellationToken) =>
         context.Users.AsNoTracking().SingleOrDefaultAsync(u => u.Id == userId, cancellationToken);
 

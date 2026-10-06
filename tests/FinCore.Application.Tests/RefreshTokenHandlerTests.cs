@@ -117,6 +117,7 @@ public class RefreshTokenHandlerTests
         public JwtTokenResult Generate(User user) { JwtCalls++; return new("access", DateTime.UtcNow.AddMinutes(15)); }
         public Task<RefreshToken?> FindByHashAsync(string hash, CancellationToken ct)
         { LookupHash = hash; CancellationTokens.Add(ct); return Task.FromResult(Token); }
+        public Task<IReadOnlyCollection<RefreshToken>> FindUnrevokedFamilyAsync(Guid userId, Guid familyId, CancellationToken ct) => throw new NotSupportedException();
         public Task<User?> FindUserAsync(Guid id, CancellationToken ct)
         { CancellationTokens.Add(ct); return Task.FromResult(User); }
         public Task AddAsync(RefreshToken token, CancellationToken ct)

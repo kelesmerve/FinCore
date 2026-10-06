@@ -198,6 +198,7 @@ public class LoginUserHandlerTests
 
     private sealed class FakeRefreshStore : IRefreshTokenStore
     {
+        public Task<IReadOnlyCollection<RefreshToken>> FindUnrevokedFamilyAsync(Guid userId, Guid familyId, CancellationToken ct) => throw new NotSupportedException();
         public Task<RefreshToken?> FindByHashAsync(string hash, CancellationToken ct) => throw new NotSupportedException();
         public Task<User?> FindUserAsync(Guid id, CancellationToken ct) => throw new NotSupportedException();
         public RefreshToken? Saved { get; private set; }

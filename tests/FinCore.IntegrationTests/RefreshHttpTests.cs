@@ -181,6 +181,7 @@ public class RefreshHttpTests
             await gate.WaitAsync(ct);
             return token;
         }
+        public Task<IReadOnlyCollection<RefreshToken>> FindUnrevokedFamilyAsync(Guid userId, Guid familyId, CancellationToken ct) => inner.FindUnrevokedFamilyAsync(userId, familyId, ct);
         public Task<User?> FindUserAsync(Guid id, CancellationToken ct) => inner.FindUserAsync(id, ct);
         public Task AddAsync(RefreshToken token, CancellationToken ct) => inner.AddAsync(token, ct);
         public Task SaveChangesAsync(CancellationToken ct) => inner.SaveChangesAsync(ct);

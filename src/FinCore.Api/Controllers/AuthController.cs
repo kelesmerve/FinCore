@@ -1,3 +1,4 @@
+using FinCore.Application.Features.Users.Logout;
 using FinCore.Application.Features.Users.Refresh;
 using System.Net.Mail;
 using FinCore.Application.Features.Users.Login;
@@ -16,6 +17,22 @@ public sealed class AuthController : ControllerBase
     public AuthController(RegisterUserHandler handler)
     {
         _handler = handler;
+    }
+
+    [AllowAnonymous]
+    [HttpPost("logout")]
+    public async Task<IActionResult> Logout(
+        RefreshRequest request, [FromServices] LogoutHandler handler, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await handler.HandleAsync(new LogoutCommand(request.RefreshToken), cancellationToken);
+            return NoContent();
+        }
+        catch (LogoutValidationException)
+        {
+            return Problem(statusCode: StatusCodes.Status400BadRequest, title: "Invalid logout input");
+        }
     }
 
     [AllowAnonymous]

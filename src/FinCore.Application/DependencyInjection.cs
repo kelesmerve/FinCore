@@ -1,3 +1,4 @@
+using FinCore.Application.Features.Users.Logout;
 using FinCore.Application.Features.Users.Refresh;
 using FinCore.Application.Features.Users.ListUsers;
 using FinCore.Application.Features.Users.Login;
@@ -14,6 +15,7 @@ public static class DependencyInjection
         services.AddScoped<LoginUserHandler>();
         services.AddScoped<ListUsersHandler>();
         services.AddScoped<RefreshTokenHandler>();
+        services.AddScoped<LogoutHandler>();
         return services;
     }
 }
