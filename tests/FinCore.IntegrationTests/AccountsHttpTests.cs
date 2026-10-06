@@ -79,8 +79,11 @@ public sealed class AccountsHttpTests
             using var json = JsonDocument.Parse(body);
             var items = json.RootElement.EnumerateArray().ToArray();
             Assert.Equal(2, items.Length);
-            var expectedIds = new[] { first, second }.OrderBy(a => a.CreatedAtUtc).ThenBy(a => a.Id)
-                .Select(a => a.Id).ToArray();
+            await using var verify = factory.CreateDbContext();
+            var expectedIds = await verify.Accounts.AsNoTracking()
+                .Where(account => account.UserId == ownUser.Id)
+                .OrderBy(account => account.CreatedAtUtc).ThenBy(account => account.Id)
+                .Select(account => account.Id).ToArrayAsync();
             Assert.Equal(expectedIds, items.Select(item => item.GetProperty("id").GetGuid()));
             Assert.All(items, item => Assert.Equal(
                 new[] { "accountNumber", "balance", "createdAtUtc", "currency", "id", "status" },

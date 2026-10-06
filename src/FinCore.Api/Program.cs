@@ -7,6 +7,9 @@ using FinCore.Application;
 using FinCore.Infrastructure;
 using FinCore.Application.Features.Users.BootstrapAdmin;
 using FinCore.Application.Features.Users.Register;
+using FinCore.Api.Health;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 var bootstrapAdmin = args.Contains("--bootstrap-admin", StringComparer.Ordinal);
 var builder = WebApplication.CreateBuilder(args.Where(argument => argument != "--bootstrap-admin").ToArray());
@@ -22,6 +25,7 @@ builder.Services.AddInfrastructure(connectionString, builder.Configuration.GetSe
 builder.Services.AddApplication();
 builder.Services.AddControllers();
 builder.Services.AddProblemDetails();
+builder.Services.AddHealthChecks().AddCheck<PostgresReadinessHealthCheck>("postgresql", tags: ["ready"]);
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
 builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
     .Configure<IOptions<JwtOptions>>((options, jwtOptions) =>
@@ -90,6 +94,18 @@ if (bootstrapAdmin)
 app.UseExceptionHandler();
 app.UseAuthentication();
 app.UseAuthorization();
+app.MapHealthChecks("/health/live", new HealthCheckOptions
+{
+    Predicate = _ => false,
+    ResponseWriter = static (context, report) =>
+        context.Response.WriteAsync(report.Status == HealthStatus.Healthy ? "Healthy" : "Unhealthy")
+}).AllowAnonymous();
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = registration => registration.Tags.Contains("ready"),
+    ResponseWriter = static (context, report) =>
+        context.Response.WriteAsync(report.Status == HealthStatus.Healthy ? "Healthy" : "Unhealthy")
+}).AllowAnonymous();
 app.MapControllers();
 
 app.Run();
