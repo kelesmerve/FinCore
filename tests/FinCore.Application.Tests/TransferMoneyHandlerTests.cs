@@ -164,7 +164,7 @@ public class TransferMoneyHandlerTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task InactiveAccount_UsesDomainRuleAndDoesNotSave(bool inactiveSource)
+    public async Task InactiveAccount_ThrowsTypedBusinessRuleAndDoesNotSave(bool inactiveSource)
     {
         // Arrange
         var fixture = new Fixture();
@@ -175,13 +175,13 @@ public class TransferMoneyHandlerTests
         var act = () => fixture.Handler.HandleAsync(fixture.Command);
 
         // Assert
-        await Assert.ThrowsAsync<InvalidOperationException>(act);
+        await Assert.ThrowsAsync<TransferBusinessRuleException>(act);
         Assert.Equal(0, fixture.Store.SaveCalls);
         Assert.Null(fixture.Store.SavedTransaction);
     }
 
     [Fact]
-    public async Task InsufficientBalance_UsesDomainRuleAndDoesNotSave()
+    public async Task InsufficientBalance_ThrowsTypedBusinessRuleAndDoesNotSave()
     {
         // Arrange
         var fixture = new Fixture();
@@ -191,8 +191,7 @@ public class TransferMoneyHandlerTests
         var act = () => fixture.Handler.HandleAsync(command);
 
         // Assert
-        var error = await Assert.ThrowsAsync<InvalidOperationException>(act);
-        Assert.Equal("Insufficient balance.", error.Message);
+        await Assert.ThrowsAsync<TransferBusinessRuleException>(act);
         Assert.Equal(0, fixture.Store.SaveCalls);
         Assert.Null(fixture.Store.SavedTransaction);
         Assert.Equal(new Money(100m), fixture.Source.Balance);

@@ -32,6 +32,10 @@ public sealed class TransferMoneyHandler(ITransferStore store)
         var destination = await store.FindAccountAsync(command.DestinationAccountId, cancellationToken)
             ?? throw new TransferAccountNotFoundException();
 
+        if (source.Status != AccountStatus.Active || destination.Status != AccountStatus.Active ||
+            source.Balance.Amount < amount.Amount)
+            throw new TransferBusinessRuleException();
+
         source.Debit(amount);
         destination.Credit(amount);
         var transaction = LedgerTransaction.CreateTransfer(source.Id, destination.Id, amount);
