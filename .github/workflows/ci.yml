@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    env:
+      ConnectionStrings__FinCoreDatabase: Host=localhost;Port=5432;Database=fincore_test;Username=fincore;Password=ci-only-postgres-password
+      Jwt__Issuer: FinCore
+      Jwt__Audience: FinCore.Client
+      Jwt__SecretKey: ci-only-test-key-not-for-real-use-0123456789abcdef
+      Jwt__AccessTokenExpirationMinutes: '15'
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: fincore_test
+          POSTGRES_USER: fincore
+          POSTGRES_PASSWORD: ci-only-postgres-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U fincore -d fincore_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Restore local tool
+        run: dotnet tool restore
+      - name: Restore NuGet packages
+        run: dotnet restore FinCore.sln
+      - name: Build Release
+        run: dotnet build FinCore.sln --configuration Release --no-restore
+      - name: Apply migrations
+        run: dotnet tool run dotnet-ef database update --project src/FinCore.Infrastructure --startup-project src/FinCore.Api --no-build --configuration Release
+      - name: Test Release
+        run: dotnet test FinCore.sln --configuration Release --no-build --no-restore
