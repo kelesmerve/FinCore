@@ -50,10 +50,10 @@ services:
         condition: service_healthy
     environment:
       BASE_URL: ${BASE_URL:-http://api:8080}
-      TEST_USER_EMAIL: ${TEST_USER_EMAIL:?TEST_USER_EMAIL is required}
       TEST_USER_PASSWORD: ${TEST_USER_PASSWORD:?TEST_USER_PASSWORD is required}
+      TEST_USER_PREFIX: ${TEST_USER_PREFIX:-fincore-lt2}
+      LOAD_TEST_USER_COUNT: ${LOAD_TEST_USER_COUNT:-25}
       TRANSFER_AMOUNT: ${TRANSFER_AMOUNT:-1.00}
-      K6_OUT: json=/results/smoke.generated.json
     volumes:
       - ./k6:/scripts:ro
       - ./data:/data:ro

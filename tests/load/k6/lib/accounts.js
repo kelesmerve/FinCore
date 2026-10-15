@@ -1,13 +1,14 @@
 import http from 'k6/http';
 import { check } from 'k6';
-import { unexpected500 } from './metrics.js';
+import { accountsMeDuration, recordStatus } from './metrics.js';
 
 export function getMyAccounts(baseUrl, accessToken) {
   const response = http.get(`${baseUrl}/api/accounts/me`, {
     headers: { Authorization: `Bearer ${accessToken}` },
-    tags: { name: 'GET /api/accounts/me' },
+    tags: { name: 'accounts_me', operation: 'accounts_me' },
   });
-  if (response.status === 500) unexpected500.add(1);
+  recordStatus(response, 'accounts_me');
+  accountsMeDuration.add(response.timings.duration);
   let accounts = null;
   try {
     accounts = response.json();
@@ -15,8 +16,8 @@ export function getMyAccounts(baseUrl, accessToken) {
     accounts = null;
   }
   check(response, {
-    'accounts returns 200': (r) => r.status === 200,
-    'accounts response is an array': () => Array.isArray(accounts),
+    'accounts_me returns 200': (r) => r.status === 200,
+    'accounts_me response is an array': () => Array.isArray(accounts),
   });
   return accounts;
 }
