@@ -5,6 +5,9 @@
 
 # dotenv files
 .env
+tests/load/.env.load
+tests/load/data/*.generated.json
+tests/load/results/
 
 # User-specific files
 *.rsuser

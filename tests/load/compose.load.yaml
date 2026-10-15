@@ -1,0 +1,65 @@
+name: fincore-load
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    ports:
+      - "127.0.0.1:${LOAD_POSTGRES_PORT:-55432}:5432"
+    volumes:
+      - fincore_load_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  api:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__FinCoreDatabase: Host=postgres;Port=5432;Database=${POSTGRES_DB:?POSTGRES_DB is required};Username=${POSTGRES_USER:?POSTGRES_USER is required};Password=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      Jwt__Issuer: ${JWT_ISSUER:-FinCore.LoadTest}
+      Jwt__Audience: ${JWT_AUDIENCE:-FinCore.LoadTest.Client}
+      Jwt__AccessTokenExpirationMinutes: 15
+      Jwt__SecretKey: ${JWT_SECRET:?JWT_SECRET is required}
+    ports:
+      - "127.0.0.1:${LOAD_API_PORT:-18080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/health/ready"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    restart: unless-stopped
+
+  k6:
+    image: grafana/k6:1.8.2
+    profiles: ["tools"]
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      BASE_URL: ${BASE_URL:-http://api:8080}
+      TEST_USER_EMAIL: ${TEST_USER_EMAIL:?TEST_USER_EMAIL is required}
+      TEST_USER_PASSWORD: ${TEST_USER_PASSWORD:?TEST_USER_PASSWORD is required}
+      TRANSFER_AMOUNT: ${TRANSFER_AMOUNT:-1.00}
+      K6_OUT: json=/results/smoke.generated.json
+    volumes:
+      - ./k6:/scripts:ro
+      - ./data:/data:ro
+      - ./results:/results
+    command: ["run", "/scripts/smoke.js"]
+
+volumes:
+  fincore_load_postgres_data:
+    name: fincore_load_postgres_data
