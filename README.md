@@ -110,6 +110,29 @@ Domain testleri iş kurallarını, Application testleri use-case akışlarını,
 
 Docker Compose, PostgreSQL 17 ve API container'larını başlatır; API, PostgreSQL healthy olduktan sonra çalışır. `/health/live` uygulamanın canlılığını, `/health/ready` PostgreSQL bağlantısını denetler. Her iki endpoint de kimlik doğrulama istemez ve hata ayrıntısı döndürmez.
 
+## Yük Testleri
+
+Yük testleri, k6 ile izole Docker/PostgreSQL ortamında çalıştırılır. Smoke ve kademeli normal load senaryoları bulunur. Normal load profili 5 → 10 → 25 sanal kullanıcıya çıkar ve toplam 225 saniye sürer. Her VU kendine ait sender/receiver hesaplarını kullanır; her transfer benzersiz `Idempotency-Key` taşır ve replay davranışı ayrıca doğrulanır. Test sonunda ledger invariantları PostgreSQL üzerinden kontrol edilir.
+
+Son yerel baseline sonuçları:
+
+| Metrik | Sonuç |
+| --- | ---: |
+| Toplam HTTP isteği | 13.286 |
+| Iteration | 6.320 |
+| Başarılı yeni transfer | 6.320 |
+| Başarılı replay | 621 |
+| Hata oranı | %0 |
+| Beklenmeyen 500 / status / conflict | 0 |
+| İstek hızı | 59,30 istek/sn |
+| Genel p95 | 30,28 ms |
+| Transfer p95 | 38,01 ms |
+| Replay p95 | 8,08 ms |
+| Ortalama yanıt süresi | 8,55 ms |
+| Maksimum yanıt süresi | 110,86 ms |
+
+Bu sonuçlar yerel bilgisayar ve ayrılan Docker kaynaklarında elde edilen baseline değerleridir; production kapasitesi veya SLA olarak yorumlanmamalıdır. Debit/Credit toplamları eşittir; duplicate idempotency kaydı ve negatif bakiye bulunmamıştır. Ayrıntılı çalıştırma talimatları için [`tests/load/README.md`](tests/load/README.md) sayfasına bakın.
+
 ## CI
 
 GitHub Actions, main branch push ve pull request'lerinde .NET tool ve NuGet restore, Release build, PostgreSQL service üzerinde migration ve tüm testleri çalıştırır.
